@@ -157,4 +157,4 @@ for(i in 1:length(namesKeyVars)) {
 NAcount
 ```
 
-**A: When looking at which variables had the highest suppression rates, the lat and long were the top 2 at about 64% and 70.4% respectively. The county variable was next highest at 42.8% and then month at about 40.2%. Additionally, when examining the number of NAs that were added in to each variable, the lat and long had the most with Lat going from 0 to 223 NAs and long going from 0 NAs to 245.**
+**A: When looking at which variables had the highest suppression rates, the lat and long were the top 2 at about 64% and 70.4% respectively. The county variable was next highest at 42.8% and then month at about 40.2%. Additionally, when examining the number of NAs that were added in to each variable, the lat and long had the most with lat going from 0 to 223 NAs and long going from 0 NAs to 245.**
