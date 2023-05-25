@@ -1,0 +1,160 @@
+---
+title: "sdcmicro-exercise"
+author: "Michelle Lam and Alex Reed"
+date: "2023-05-25"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+# Whale Entanglement sdcMicro Exercise
+
+Your team acquired a dataset\* from researchers working with [whale entanglement data on the West Coast](https://drive.google.com/file/d/1MemLmCRFtkyakWJOH_8iosGIMRKfsQVv/view?usp=share_link). The dataset contains both direct and indirect identifiers. Your task is to assess the risk of re-identification of the fisheries associated with the cases before considering public release. Then, you should test one technique and apply k-anonymization to help lower the disclosure risk as well as compute the information loss.
+
+Please complete this exercise in pairs or groups of three. Each group should download the dataset and complete the rmd file, including the code and answering the questions. Remember to include your names in the YAML.
+
+*\*This dataset was purposefully adapted exclusively for instruction use.*
+
+#### *Setup*
+
+#### Package & Data
+
+```{r}
+library(sdcMicro)
+whale_data <- read.csv("whale-sdc.csv")
+```
+
+#### Inspect the Dataset
+
+```{r}
+head(whale_data)
+str(whale_data)
+```
+
+#### **Q1. How many direct identifiers are present in this dataset? What are they?**
+
+**A: There is 1 direct identifier for fisheries: fishery_license**
+
+#### **Q2. What attributes would you consider quasi-identifiers? Why?**
+
+**A: The rest of the attributes could be quasi-identifiers because they can be used in combination to identify a fishery.**
+
+#### **Q3. What types of variables are they? Define them. (numeric, integer, factor or string)**
+
+**A: For the purposes of this exercise, the year, month, type, county, state, inj_level, condition, origin, gear, fine, infraction_type, lat, and long can be considered factor variables.**
+
+Make sure to have them set correctly.
+
+```{r}
+fname_whale = "whale-sdc.csv"
+file_whale <- read.csv(fname_whale)
+# assign variables in df as factors (variables we want to define as categorical)
+file_whale <- varToFactor(obj=file_whale, var=c("year","month", "type",
+                                                "county","state", "inj_level",
+                                                "condition", "origin", "gear", 
+                                                "fine", "infraction_type", "lat",
+                                                "long"))
+
+```
+
+#### ***4 Considering your answers to questions 1, 2 and 3 create a SDC problem.***
+
+#### **Q4.1 What is the risk of re-identification for this dataset?**
+
+```{r}
+sdcInitial <- createSdcObj(dat=file_whale,
+                       keyVars=c("year","month", "type", "county","state", 
+                                 "inj_level", "condition", "origin", "gear", 
+                                 "fine", "infraction_type", "lat", "long"),
+                       numVars=NULL,
+                       weightVar=NULL,
+                       hhId=NULL,
+                       strataVar=NULL,
+                       pramVars=NULL,
+                       excludeVars=c("fishery_license"),
+                       seed=0,
+                       randomizeRecords=FALSE,
+                       alpha=c(1))
+
+sdcInitial@risk$global$risk
+```
+
+**A: The risk of re-identification for this dataset is 1 or 100%.**
+
+#### Q4.2 To what extent does this dataset violate k-anonymity?
+
+```{r}
+# look at sdc object
+sdcInitial
+
+# look at which observations have a higher risk of being re-identified
+sdcInitial@risk$individual
+
+# how many combinations of key variables does each record have
+freq(sdcInitial, type = 'fk')
+```
+
+**A: Looking at the sdc object, 100% of the observations in the data set violate 2, 3, and 5 anonymity.**
+
+#### *5. Consider techniques that could reduce the risk of re-identification.*
+
+#### Q5.1 Apply one non-perturbative method to a variable of your choice. How effective was it in lowering the disclosure risk?
+
+```{r}
+# Frequencies of year before recoding
+table(sdcInitial@manipKeyVars$year)
+
+## Recode variable year (top coding)
+sdcInitial <- groupAndRename(obj= sdcInitial, var= c("year"), 
+                             before=c("2000", "2001", "2002", "2003", "2004", 
+                                      "2005", "2006", "2007", "2008", "2009"), 
+                             after=c("2000-2009"))
+
+## Recode variable year (bottom coding)
+sdcInitial <- groupAndRename(obj= sdcInitial, var= c("year"), 
+                             before=c("2010", "2011", "2012", "2013", "2014",
+                                      "2015", "2016", "2017", "2018", "2019"), 
+                             after=c("2010-2019"))
+
+
+sdcInitial@risk$global$risk
+print(sdcInitial, 'kAnon')
+```
+
+**A: When applying top and bottom coding to the sdc object for year, it was not effective at all for lowering disclosure risk. The risk is still 1 or 100%.**
+
+#### Q5.2 Apply ( k-3) anonymization to this dataset.
+
+```{r}
+# apply k-3 anonymization
+sdcInitial <- kAnon(sdcInitial, k = c(3))
+sdcInitial@risk$global$risk
+```
+
+**A: After k-3 anonymization, risk for this dataset decreased to about 0.24.**
+
+#### Q6. Compute the information loss for the de-identified version of the dataset.
+
+```{r}
+# show suppression rates
+print(sdcInitial, 'ls')
+
+#We can also compare the number of NAs before and after our interventions
+# Store the names of all categorical key variables in a vector
+namesKeyVars <- names(sdcInitial@manipKeyVars)
+
+# Matrix to store the number of missing values (NA) before and after anonymization
+NAcount <- matrix(NA, nrow = 2, ncol = length(namesKeyVars))
+colnames(NAcount) <- c(paste0('NA', namesKeyVars)) # column names
+rownames(NAcount) <- c('initial', 'treated') # row names
+
+# NA count in all key variables (NOTE: only those coded NA are counted)
+for(i in 1:length(namesKeyVars)) {
+  NAcount[1, i] <- sum(is.na(sdcInitial@origData[,namesKeyVars[i]]))
+  NAcount[2, i] <- sum(is.na(sdcInitial@manipKeyVars[,i]))}
+
+# Show results
+NAcount
+```
+
+**A: When looking at which variables had the highest suppression rates, the lat and long were the top 2 at about 64% and 70.4% respectively. The county variable was next highest at 42.8% and then month at about 40.2%. Additionally, when examining the number of NAs that were added in to each variable, the lat and long had the most with Lat going from 0 to 223 NAs and long going from 0 NAs to 245.**
